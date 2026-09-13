@@ -1,110 +1,173 @@
-# Prédiction du risque de diabète (Pima Indians Diabetes)
+# Diabetes Risk Prediction
 
-Pipeline de classification binaire pour prédire le risque de diabète à
-partir de mesures cliniques (glycémie, IMC, tension, âge, etc.),
-comparant régression logistique et random forest.
+Pipeline de machine learning pour estimer le risque de diabète à partir de
+mesures cliniques. Le projet compare une régression logistique interprétable
+à un modèle `RandomForestClassifier`, tout en traitant explicitement les
+valeurs manquantes cachées du jeu de données Pima Indians Diabetes.
 
-## Pourquoi ce projet
+> **Avertissement** : ce projet est éducatif. Les prédictions ne constituent
+> ni un diagnostic, ni un avis médical, ni une recommandation de prise en
+> charge. Le modèle n'est pas validé pour un usage clinique.
 
-Jeu de données de référence en apprentissage supervisé (Pima Indians
-Diabetes Dataset), utile pour pratiquer un pipeline de classification
-médicale complet : détection d'un problème de qualité de données caché,
-imputation sans fuite, gestion du déséquilibre de classes, comparaison de
-modèles et interprétation des facteurs de risque.
+## Résultats clés
 
-## Jeu de données
+Évaluation sur un jeu de test stratifié représentant 20 % des 768 lignes,
+avec `random_state=42`. Les métriques ci-dessous sont celles générées par
+la dernière exécution de `src/train.py` et enregistrées dans
+`outputs/metrics.json`.
 
-`data/diabetes.csv` : 768 patientes, 8 variables cliniques (nombre de
-grossesses, glycémie, tension artérielle, épaisseur du pli cutané,
-insulinémie, IMC, fonction de pedigree du diabète, âge) et une variable
-cible binaire `Outcome` (diabète ou non). ~34.9% de cas positifs.
+| Modèle | Accuracy | Précision classe 1 | Rappel classe 1 | F1 classe 1 | ROC AUC |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Régression logistique | 0,734 | 0,603 | 0,704 | 0,650 | 0,812 |
+| **Random forest** | **0,760** | **0,644** | **0,704** | **0,673** | **0,831** |
 
-## Point technique important : les zéros ne sont pas des zéros
+Le random forest est sélectionné automatiquement selon le ROC AUC, puis
+sauvegardé dans `models/model.pkl`. Les deux modèles utilisent
+`class_weight="balanced"` pour tenir compte des 34,9 % de cas positifs.
 
-**Ce jeu de données n'était accompagné d'aucun code** — et il contient un
-piège classique et bien documenté sur ce dataset précis : les colonnes
-`Glucose`, `BloodPressure`, `SkinThickness`, `Insulin` et `BMI` utilisent
-**0 comme encodage de valeur manquante**, pas comme une vraie mesure (une
-glycémie ou une tension artérielle de 0 chez une personne vivante n'existe
-pas). Sans traitement, un modèle entraîné directement sur les données
-brutes apprendrait des zéros artificiels comme s'il s'agissait de vraies
-valeurs basses — un biais silencieux, sans erreur ni warning pour le
-signaler.
+## Démarrage rapide
 
-Répartition réelle des zéros suspects dans le dataset :
+### 1. Installer l'environnement
 
-| Colonne | % de zéros |
-|---|---|
-| Insulin | 48.7% |
-| SkinThickness | 29.6% |
-| BloodPressure | 4.6% |
-| BMI | 1.4% |
-| Glucose | 0.7% |
-
-`src/data_prep.py` remplace ces zéros par de vraies valeurs manquantes
-(NaN), puis les impute par la **médiane calculée uniquement sur le jeu
-d'entraînement** (pas de fuite de données vers le test) — cette médiane
-est aussi sauvegardée dans le modèle pour être réutilisée à l'identique
-sur de nouveaux patients (`src/predict.py`).
-
-## Structure du projet
-
-```
-diabetes-risk-prediction/
-├── data/
-│   ├── diabetes.csv
-│   └── new_patients_example.csv   # exemple pour predict.py
-├── src/
-│   ├── data_prep.py                # correction zéros->NaN, split, imputation, scaling
-│   ├── train.py                    # entraînement + comparaison de modèles
-│   └── predict.py                  # prédiction sur de nouveaux patients
-├── models/                         # modèle entraîné (model.pkl, généré)
-├── outputs/                        # métriques générées (metrics.json)
-├── requirements.txt
-├── .gitignore
-├── LICENSE
-└── README.md
-```
-
-## Installation
+Python 3.12 est recommandé.
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
-## Utilisation
+### 2. Entraîner les modèles
 
 ```bash
-python3 src/train.py --data data/diabetes.csv
-python3 src/predict.py --patients data/new_patients_example.csv
+python src/train.py --data data/diabetes.csv
 ```
 
-## Résultats obtenus (exécution réelle sur les 768 patientes)
+Cette commande compare les deux modèles, affiche leurs métriques et produit :
 
-| Modèle | Accuracy | Recall (classe 1) | ROC AUC |
-|---|---|---|---|
-| Régression logistique | 0.73 | 0.70 | 0.812 |
-| Random Forest | 0.75 | 0.57 | **0.816** |
+- `models/model.pkl` : modèle retenu et éléments du prétraitement ;
+- `outputs/metrics.json` : rapports de classification, matrices de confusion
+	et ROC AUC.
 
-Random Forest légèrement meilleur en AUC, mais la régression logistique
-détecte mieux les cas positifs (rappel 0.70 vs 0.57) — un compromis
-important en contexte médical, où manquer un cas de diabète (faux négatif)
-est en général plus coûteux qu'une fausse alerte. Les deux modèles
-utilisent `class_weight="balanced"` pour compenser le déséquilibre des
-classes (34.9% de cas positifs).
+### 3. Prédire sur de nouveaux patients
 
-Facteurs de risque les plus déterminants (coefficients de la régression
-logistique, sur variables standardisées) : **Glucose** (1.18), **BMI**
-(0.71), puis Pregnancies (0.37) — cohérent avec la littérature médicale
-sur le diabète de type 2.
+```bash
+python src/predict.py --patients data/new_patients_example.csv
+```
 
-## Stack technique
+Le fichier de modèle doit exister avant cette étape. Un chemin différent
+peut être fourni avec `--model` :
 
-Python, pandas, numpy, scikit-learn (LogisticRegression, RandomForest,
-StandardScaler).
+```bash
+python src/predict.py \
+	--patients data/new_patients_example.csv \
+	--model models/model.pkl
+```
+
+La sortie indique la classe prédite (`1` ou `0`) et la probabilité estimée
+de la classe positive pour chaque ligne.
+
+## Format des données
+
+### Entraînement
+
+`data/diabetes.csv` contient 768 patientes et les colonnes suivantes :
+
+| Colonne | Description |
+| --- | --- |
+| `Pregnancies` | Nombre de grossesses |
+| `Glucose` | Concentration de glucose |
+| `BloodPressure` | Pression artérielle diastolique |
+| `SkinThickness` | Épaisseur du pli cutané |
+| `Insulin` | Insulinémie |
+| `BMI` | Indice de masse corporelle |
+| `DiabetesPedigreeFunction` | Fonction de pedigree du diabète |
+| `Age` | Âge |
+| `Outcome` | Cible : `0` ou `1` |
+
+### Prédiction
+
+Un fichier fourni à `--patients` doit contenir les huit variables
+explicatives, dans n'importe quel ordre. Il ne doit pas contenir la colonne
+`Outcome`.
+
+Exemple minimal de structure :
+
+```csv
+Pregnancies,Glucose,BloodPressure,SkinThickness,Insulin,BMI,DiabetesPedigreeFunction,Age
+6,148,72,35,0,33.6,0.627,50
+1,85,66,29,0,26.6,0.351,31
+```
+
+## Prétraitement et prévention de la fuite de données
+
+Le pipeline de `src/data_prep.py` applique les mêmes règles à
+l'entraînement et à la prédiction :
+
+1. Les zéros de `Glucose`, `BloodPressure`, `SkinThickness`, `Insulin` et
+	 `BMI` sont considérés comme des valeurs manquantes. Dans ce dataset, ils
+	 représentent notamment 48,7 % des valeurs de `Insulin` et 29,6 % de
+	 celles de `SkinThickness`.
+2. Les valeurs manquantes sont imputées par la médiane.
+3. Le jeu est séparé avec stratification avant l'imputation destinée au
+	 modèle.
+4. Les médianes et le `StandardScaler` sont calculés à partir du train
+	 uniquement.
+5. Ces statistiques sont stockées dans `model.pkl` et réutilisées pour les
+	 nouveaux patients.
+
+Cette organisation évite que les statistiques du jeu de test ou des
+patients à prédire influencent l'entraînement.
+
+## Structure du dépôt
+
+```text
+diabetes-risk-prediction/
+├── data/
+│   ├── diabetes.csv                  # jeu d'entraînement
+│   └── new_patients_example.csv      # exemples de prédiction
+├── models/                           # artefacts générés
+├── outputs/
+│   └── metrics.json                  # métriques générées
+├── src/
+│   ├── data_prep.py                  # nettoyage et préparation
+│   ├── train.py                      # entraînement et évaluation
+│   └── predict.py                    # prédiction sur un CSV
+├── requirements.txt
+├── LICENSE
+└── README.md
+```
+
+## Interprétation
+
+Les coefficients de la régression logistique, calculés sur les variables
+standardisées, donnent un repère d'interprétation du modèle linéaire. Dans
+l'exécution de référence, les contributions positives les plus fortes sont
+associées à `Glucose` (1,184), `BMI` (0,710) et `Pregnancies` (0,373).
+Ces coefficients ne sont pas des causalités médicales et ne doivent pas
+être interprétés séparément du contexte clinique.
+
+## Limites
+
+- Le jeu de données est petit et provient d'une population spécifique ; sa
+	représentativité pour d'autres populations n'est pas établie.
+- L'évaluation repose sur un seul découpage train/test et ne remplace pas
+	une validation externe ou une validation croisée complète.
+- Les probabilités affichées n'ont pas fait l'objet d'une étude de
+	calibration.
+- Le seuil de décision par défaut du classifieur n'a pas été optimisé pour
+	un cas d'usage clinique particulier.
+- Aucune décision médicale ne doit être automatisée à partir de ce dépôt.
+
+## Dépendances
+
+- Python 3
+- pandas
+- NumPy
+- scikit-learn
+
+Les versions minimales sont précisées dans `requirements.txt`.
 
 ## Licence
 
-MIT — voir [LICENSE](./LICENSE).
+Projet distribué sous licence MIT. Voir [LICENSE](LICENSE).
