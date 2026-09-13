@@ -27,7 +27,14 @@ sauvegardé dans `models/model.pkl`. Les deux modèles utilisent
 
 ## Démarrage rapide
 
-### 1. Installer l'environnement
+### 1. Cloner le dépôt
+
+```bash
+git clone https://github.com/Adam01-i/diabetes-risk-prediction.git
+cd diabetes-risk-prediction
+```
+
+### 2. Installer l'environnement
 
 Python 3.12 est recommandé.
 
@@ -37,7 +44,7 @@ source venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-### 2. Entraîner les modèles
+### 3. Entraîner les modèles
 
 ```bash
 python src/train.py --data data/diabetes.csv
@@ -49,7 +56,7 @@ Cette commande compare les deux modèles, affiche leurs métriques et produit :
 - `outputs/metrics.json` : rapports de classification, matrices de confusion
 	et ROC AUC.
 
-### 3. Prédire sur de nouveaux patients
+### 4. Prédire sur de nouveaux patients
 
 ```bash
 python src/predict.py --patients data/new_patients_example.csv
